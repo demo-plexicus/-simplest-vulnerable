@@ -13,27 +13,52 @@ if ($conn->connect_error) {
     die("Conexión fallida: " . $conn->connect_error);
 }
 
-// Vulnerabilidad de SQL Injection
-// El siguiente código es vulnerable a SQL Injection ya que el input del usuario se concatena directamente en la consulta SQL sin validación o sanitización.
+// EEGSA
+
+// Vulnerabilidad de SQL Injection mitigada
+// Ahora se utiliza una sentencia preparada y validación estricta del parámetro 'id' para prevenir SQL Injection.
 if(isset($_GET['id'])) {
     $id = $_GET['id']; // Input del usuario tomado directamente desde la URL
-    $sql = "SELECT * FROM usuarios WHERE id = $id"; // Vulnerable a SQL Injection
-    $result = $conn->query($sql);
 
-    if ($result->num_rows > 0) {
-        while($row = $result->fetch_assoc()) {
-            echo "id: " . $row["id"]. " - Nombre: " . $row["nombre"]. "<br>";
-        }
+    // Validación: asegurarse de que 'id' es un entero
+    if (!filter_var($id, FILTER_VALIDATE_INT)) {
+        echo "ID inválido";
     } else {
-        echo "0 resultados";
+        // Defensa en profundidad: coerción explícita a entero
+        $id_int = (int)$id;
+
+        // Preparar la sentencia para evitar concatenación de entradas del usuario en la consulta SQL
+        $stmt = $conn->prepare("SELECT id, nombre FROM usuarios WHERE id = ?");
+        if ($stmt) {
+            $stmt->bind_param("i", $id_int);
+            $stmt->execute();
+
+            // Vincular resultados y obtenerlos de forma segura
+            $stmt->bind_result($res_id, $res_nombre);
+            $found = false;
+            while ($stmt->fetch()) {
+                $found = true;
+                // Escapar/encodear la salida para prevenir XSS reflejado
+                echo "id: " . htmlspecialchars($res_id, ENT_QUOTES, 'UTF-8') . " - Nombre: " . htmlspecialchars($res_nombre, ENT_QUOTES, 'UTF-8') . "<br>";
+            }
+
+            if (!$found) {
+                echo "0 resultados";
+            }
+
+            $stmt->close();
+        } else {
+            // En caso de error al preparar la consulta, no exponer detalles sensibles
+            echo "Error en la consulta";
+        }
     }
 }
 
-// Vulnerabilidad de Cross-Site Scripting (XSS)
-// El siguiente código es vulnerable a XSS ya que imprime directamente en el HTML el contenido de una variable que puede ser manipulada por el usuario sin ninguna sanitización.
+// Vulnerabilidad de Cross-Site Scripting (XSS) mitigada
+// Se encodea la salida para evitar la inyección de HTML/JS cuando se muestra 'mensaje'.
 if(isset($_GET['mensaje'])) {
     $mensaje = $_GET['mensaje']; // Input del usuario susceptible a XSS
-    echo "<div>$mensaje</div>"; // Vulnerable a XSS
+    echo "<div>" . htmlspecialchars($mensaje, ENT_QUOTES, 'UTF-8') . "</div>"; // Salida segura
 }
 
 // Cerrar conexión
