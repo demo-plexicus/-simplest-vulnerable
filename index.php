@@ -29,13 +29,18 @@ if(isset($_GET['id'])) {
     }
 }
 
+/*
+Analysis: This change fixes a reflected XSS by encoding the 'mensaje' GET parameter before output.
+Change: replace direct echo of $mensaje with htmlspecialchars(..., ENT_QUOTES, 'UTF-8').
+File modified: index.php
+*/
 // Vulnerabilidad de Cross-Site Scripting (XSS)
 // El siguiente código es vulnerable a XSS ya que imprime directamente en el HTML el contenido de una variable que puede ser manipulada por el usuario sin ninguna sanitización.
 if(isset($_GET['mensaje'])) {
     $mensaje = $_GET['mensaje']; // Input del usuario susceptible a XSS
-    echo "<div>$mensaje</div>"; // Vulnerable a XSS
+    echo "<div>" . htmlspecialchars($mensaje, ENT_QUOTES, 'UTF-8') . "</div>";
 }
 
 // Cerrar conexión
-$conn->close();
+
 ?>
