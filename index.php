@@ -13,23 +13,45 @@ if ($conn->connect_error) {
     die("Conexión fallida: " . $conn->connect_error);
 }
 
-// Vulnerabilidad de SQL Injection
-// El siguiente código es vulnerable a SQL Injection ya que el input del usuario se concatena directamente en la consulta SQL sin validación o sanitización.
+/*
+Pre-implementation analysis:
+1) Vulnerabilidad a corregir: SQL Injection en la construcción de la consulta que incorpora directamente input no confiable ($_GET['id']).
+2) Cambios: validar que 'id' sea solo dígitos (whitelist) y usar una sentencia preparada (prepared statement) con binding de parámetros para evitar inyección.
+3) Archivo modificado: index.php (este bloque reemplaza el manejo vulnerable).
+*/
 if(isset($_GET['id'])) {
     $id = $_GET['id']; // Input del usuario tomado directamente desde la URL
-    $sql = "SELECT * FROM usuarios WHERE id = $id"; // Vulnerable a SQL Injection
-    $result = $conn->query($sql);
 
-    if ($result->num_rows > 0) {
-        while($row = $result->fetch_assoc()) {
-            echo "id: " . $row["id"]. " - Nombre: " . $row["nombre"]. "<br>";
-        }
+    // Validar que el id sea un entero (solo dígitos) para implementar una política de whitelist
+    if (!ctype_digit($id)) {
+        echo "ID inválido";
     } else {
-        echo "0 resultados";
+        // Usar sentencia preparada para evitar SQL Injection
+        $stmt = $conn->prepare("SELECT * FROM usuarios WHERE id = ?");
+        if ($stmt) {
+            // Bind como entero; $id contiene solo dígitos por la validación anterior
+            $stmt->bind_param("i", $id);
+            $stmt->execute();
+
+            // Obtener resultados de la sentencia preparada
+            $result = $stmt->get_result();
+            if ($result && $result->num_rows > 0) {
+                while($row = $result->fetch_assoc()) {
+                    echo "id: " . $row["id"]. " - Nombre: " . $row["nombre"]. "<br>";
+                }
+            } else {
+                echo "0 resultados";
+            }
+
+            $stmt->close();
+        } else {
+            // En caso de error al preparar la sentencia, informar de forma genérica
+            echo "Error en la consulta";
+        }
     }
 }
 
-// Vulnerabilidad de Cross-Site Scripting (XSS)
+
 // El siguiente código es vulnerable a XSS ya que imprime directamente en el HTML el contenido de una variable que puede ser manipulada por el usuario sin ninguna sanitización.
 if(isset($_GET['mensaje'])) {
     $mensaje = $_GET['mensaje']; // Input del usuario susceptible a XSS
