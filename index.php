@@ -1,4 +1,14 @@
 <?php
+// Iniciar sesión para poder identificar al usuario autenticado
+session_start();
+
+// Control de acceso a nivel de objeto: solo usuarios autenticados
+// pueden leer registros, y solo su PROPIO registro (verificación de propiedad).
+if (!isset($_SESSION['user_id'])) {
+    http_response_code(401);
+    die("Acceso denegado: autenticación requerida.");
+}
+
 // Conexión a la base de datos (modifica con tus propios parámetros de conexión)
 $servername = "localhost";
 $username = "tu_usuario";
@@ -16,8 +26,16 @@ if ($conn->connect_error) {
 // Vulnerabilidad de SQL Injection
 // El siguiente código es vulnerable a SQL Injection ya que el input del usuario se concatena directamente en la consulta SQL sin validación o sanitización.
 if(isset($_GET['id'])) {
-    $id = $_GET['id']; // Input del usuario tomado directamente desde la URL
-    $sql = "SELECT * FROM usuarios WHERE id = $id"; // Vulnerable a SQL Injection
+    $id = (int)$_GET['id']; // Input del usuario cast a entero
+
+    // Verificación de propiedad: el id solicitado debe coincidir con el
+    // identificador del usuario autenticado (previene BOLA/IDOR).
+    if ($id !== (int)$_SESSION['user_id']) {
+        http_response_code(403);
+        die("Acceso denegado: solo puedes leer tu propio registro.");
+    }
+
+    $sql = "SELECT * FROM usuarios WHERE id = $id";
     $result = $conn->query($sql);
 
     if ($result->num_rows > 0) {
